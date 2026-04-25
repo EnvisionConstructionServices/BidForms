@@ -201,25 +201,48 @@ const App = () => {
               <div key={header} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <h2 className="bg-slate-800 text-white p-3 font-bold">{header}</h2>
                 <div className="p-4 space-y-4">
-                  {formData.sections[header].map((item, idx) => (
-                    <div key={idx} className={`flex flex-col md:flex-row gap-4 py-2 border-b border-slate-50 last:border-0 ${item.type === 'SUBHEADER' ? 'bg-slate-50 -mx-4 px-4 py-3 font-bold italic text-slate-400' : ''}`}>
-                      <div className="flex-1">
-                        <span className="text-slate-400 text-xs mr-3 font-mono">{item.number}</span>
-                        <span dangerouslySetInnerHTML={{ __html: item.description }} />
-                      </div>
-                      {item.type !== 'SUBHEADER' && !item.isBold && (
-                        <div className="md:w-64 shrink-0">
-                          <input 
-                            name={`${item.number || 'field'}_${item.type}`} 
-                            type="text" 
-                            className="w-full border p-2 rounded text-center focus:ring-2 focus:ring-green-500 outline-none"
-                            placeholder="Response"
-                            required
-                          />
+                  {formData.sections[header].map((item, idx) => {
+                    const type = (item.type || '').toUpperCase();
+                    // Ensures the name strictly matches the format expected by the GAS backend parser
+                    const inputName = `${item.number ? String(item.number).replace(/[^a-zA-Z0-9]/g, '_') : 'field'}_${(item.type || 'text').toLowerCase()}`;
+                    
+                    return (
+                      <div key={idx} className={`flex flex-col md:flex-row gap-4 py-2 border-b border-slate-50 last:border-0 ${item.type === 'SUBHEADER' ? 'bg-slate-50 -mx-4 px-4 py-3 font-bold italic text-slate-400' : ''}`}>
+                        <div className="flex-1">
+                          <span className="text-slate-400 text-xs mr-3 font-mono">{item.number}</span>
+                          <span dangerouslySetInnerHTML={{ __html: item.description }} />
                         </div>
-                      )}
-                    </div>
-                  ))}
+                        {item.type !== 'SUBHEADER' && !item.isBold && (
+                          <div className="md:w-64 shrink-0 flex items-center gap-2">
+                            {type === 'YES/NO' || type === 'Y/N' ? (
+                              <select name={inputName} className="w-full border p-2 rounded text-center focus:ring-2 focus:ring-green-500 outline-none bg-white" required>
+                                <option value="">Select...</option>
+                                <option value="Yes">Yes</option>
+                                <option value="No">No</option>
+                              </select>
+                            ) : ['$', 'TOTAL', 'P&P', 'TAX'].includes(type) ? (
+                              <div className="relative w-full">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">$</span>
+                                <input name={inputName} type="number" step="0.01" className="w-full border p-2 pl-8 rounded text-left focus:ring-2 focus:ring-green-500 outline-none" placeholder="0.00" required />
+                              </div>
+                            ) : type === '%' ? (
+                              <div className="relative w-full">
+                                <input name={inputName} type="number" step="0.01" className="w-full border p-2 pr-8 rounded text-right focus:ring-2 focus:ring-green-500 outline-none" placeholder="0" required />
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">%</span>
+                              </div>
+                            ) : ['DAYS', 'WEEKS', 'PERSONNEL', 'SF', 'LF', 'EA', 'SY', 'CY', 'TN', 'LS', 'MH', 'TONS'].includes(type) ? (
+                              <div className="flex w-full items-center gap-2">
+                                <input name={inputName} type="number" step="any" className="w-full border p-2 rounded text-center focus:ring-2 focus:ring-green-500 outline-none" placeholder="0" required />
+                                <span className="text-slate-500 text-sm font-bold w-12 shrink-0">{type}</span>
+                              </div>
+                            ) : (
+                              <input name={inputName} type="text" className="w-full border p-2 rounded text-center focus:ring-2 focus:ring-green-500 outline-none" placeholder="Response" required />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}
