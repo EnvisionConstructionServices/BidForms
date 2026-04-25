@@ -34,6 +34,17 @@ jobs:
         run: npm install
       - name: Build
         run: npm run build
+      - name: Debug Directory
+        run: |
+          echo "Checking directory contents after build:"
+          ls -la
+          echo "Checking if dist folder exists:"
+          if [ ! -d "dist" ]; then
+            echo "❌ ERROR: 'dist' folder was not created! Check your folder structure."
+            exit 1
+          else
+            echo "✅ 'dist' folder found."
+          fi
       - name: Setup Pages
         uses: actions/configure-pages@v4
       - name: Upload artifact
