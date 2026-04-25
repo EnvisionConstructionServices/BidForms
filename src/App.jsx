@@ -242,27 +242,31 @@ const App = () => {
                               }
                               if (type === '$' || type === 'TOTAL' || type === 'P&P' || type === 'TAX') {
                                 return (
-                                  <div className="relative w-full">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">$</span>
-                                    <input name={inputName} type="number" step="0.01" className="w-full border p-2 pl-8 rounded text-left focus:ring-2 focus:ring-green-500 outline-none" placeholder="0.00" required />
+                                  <div className="flex w-full rounded-lg border border-slate-200 bg-white overflow-hidden focus-within:border-green-500 focus-within:ring-1 focus-within:ring-green-500 transition-shadow shadow-sm">
+                                    <div className="flex items-center justify-center bg-slate-50 px-3 border-r border-slate-200 text-slate-500 font-semibold select-none">
+                                      $
+                                    </div>
+                                    <input name={inputName} type="number" step="0.01" className="w-full py-2 px-3 outline-none bg-transparent text-left" placeholder="0.00" required />
                                   </div>
                                 );
                               }
                               if (type === 'EMAIL') {
-                                return <input name={inputName} type="email" className="w-full border p-2 rounded text-center focus:ring-2 focus:ring-green-500 outline-none" placeholder="Email Address" required />;
+                                return <input name={inputName} type="email" className="w-full border border-slate-200 rounded-lg py-2 px-3 text-center focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none shadow-sm transition-shadow" placeholder="Email Address" required />;
                               }
                               if (type === 'PHONE') {
-                                return <input name={inputName} type="tel" className="w-full border p-2 rounded text-center focus:ring-2 focus:ring-green-500 outline-none" placeholder="Phone Number" required />;
+                                return <input name={inputName} type="tel" className="w-full border border-slate-200 rounded-lg py-2 px-3 text-center focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none shadow-sm transition-shadow" placeholder="Phone Number" required />;
                               }
                               if (type === 'TEXT' || type === '') {
-                                return <input name={inputName} type="text" className="w-full border p-2 rounded text-center focus:ring-2 focus:ring-green-500 outline-none" placeholder="Response" required />;
+                                return <input name={inputName} type="text" className="w-full border border-slate-200 rounded-lg py-2 px-3 text-center focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none shadow-sm transition-shadow" placeholder="Response" required />;
                               }
                               
                               // Default: Treat as a suffix appended to the response value
                               return (
-                                <div className="flex w-full items-center gap-2">
-                                  <input name={inputName} type="number" step="any" className="w-full border p-2 rounded text-center focus:ring-2 focus:ring-green-500 outline-none" placeholder="0" required />
-                                  <span className="text-slate-500 text-sm font-bold shrink-0">{type}</span>
+                                <div className="flex w-full rounded-lg border border-slate-200 bg-white overflow-hidden focus-within:border-green-500 focus-within:ring-1 focus-within:ring-green-500 transition-shadow shadow-sm">
+                                  <input name={inputName} type="number" step="any" className="w-full py-2 px-3 outline-none bg-transparent text-right" placeholder="0" required />
+                                  <div className="flex items-center justify-center bg-slate-50 px-3 border-l border-slate-200 text-slate-500 font-bold text-xs select-none min-w-[3.5rem]">
+                                    {type}
+                                  </div>
                                 </div>
                               );
                             })()}
