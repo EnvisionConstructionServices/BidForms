@@ -216,14 +216,27 @@ const App = () => {
                           <div className="md:w-64 shrink-0 flex items-center gap-2">
                             {(() => {
                               if (type === 'Y/N/NA' || type === 'Y/N' || type === 'YES/NO') {
+                                const options = type === 'Y/N/NA' ? ['Yes', 'No', 'N/A'] : ['Yes', 'No'];
                                 return (
-                                  <div className="flex gap-4 items-center justify-center w-full h-full min-h-[42px]">
-                                    {['Yes', 'No', 'N/A'].map(opt => (
-                                      <label key={opt} className="flex items-center gap-1 cursor-pointer">
-                                        <input type="radio" name={inputName} value={opt} required className="accent-green-600 w-4 h-4" />
-                                        <span className="text-sm font-medium text-slate-700">{opt}</span>
-                                      </label>
-                                    ))}
+                                  <div className="flex gap-2 items-center justify-center w-full h-full min-h-[42px]">
+                                    {options.map(opt => {
+                                      // Determine the color based on the option
+                                      let activeClass = '';
+                                      if (opt === 'Yes') activeClass = 'peer-checked:bg-green-600 peer-checked:text-white peer-checked:border-green-600';
+                                      else if (opt === 'No') activeClass = 'peer-checked:bg-red-500 peer-checked:text-white peer-checked:border-red-500';
+                                      else activeClass = 'peer-checked:bg-slate-500 peer-checked:text-white peer-checked:border-slate-500';
+                                      
+                                      return (
+                                        <label key={opt} className="flex-1 cursor-pointer">
+                                          {/* Hidden Radio Button (peer) */}
+                                          <input type="radio" name={inputName} value={opt} required className="peer sr-only" />
+                                          {/* Visible Button */}
+                                          <div className={`text-center px-2 py-2 text-sm font-bold rounded-lg border-2 border-slate-100 bg-slate-50 text-slate-400 transition-all hover:bg-slate-200 ${activeClass}`}>
+                                            {opt}
+                                          </div>
+                                        </label>
+                                      );
+                                    })}
                                   </div>
                                 );
                               }
