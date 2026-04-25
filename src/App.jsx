@@ -52,6 +52,10 @@ const App = () => {
         const data = await apiGet(backendUrl, { action: 'getInitialData' });
         setInitialData(data);
         
+        // Update the browser tab title dynamically
+        const projectName = data.projectInfo?.[0]?.value || "Project";
+        document.title = `Envision CS - ${projectName} Bid Forms`;
+        
         // Fetch logos
         apiGet(backendUrl, { action: 'getMainLogo' }).then(url => setLogos(prev => ({ ...prev, main: url })));
         apiGet(backendUrl, { action: 'getDriveImage', fileId: '1CyxISCVHpHmRg6GsXVCc2xaSNP-teXzY' }).then(url => setLogos(prev => ({ ...prev, wmdbe: url })));
@@ -197,9 +201,14 @@ const App = () => {
           </button>
           <h1 className="text-3xl font-bold mb-6">Bid Form: {formData.scopeName}</h1>
           <form onSubmit={handleFormSubmit} className="space-y-8">
-            {formData.orderedHeaders.map(header => (
+            {formData.orderedHeaders.map((header, index) => (
               <div key={header} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <h2 className="bg-slate-800 text-white p-3 font-bold">{header}</h2>
+                <h2 
+                  className="bg-slate-800 text-white p-3 font-bold"
+                  style={{ borderTop: `4px solid ${index % 2 === 0 ? '#59BA48' : '#1B95D2'}` }}
+                >
+                  {header}
+                </h2>
                 <div className="p-4 space-y-4">
                   {formData.sections[header].map((item, idx) => {
                     const type = (item.type || '').toUpperCase();
@@ -263,8 +272,8 @@ const App = () => {
                               // Default: Treat as a suffix appended to the response value
                               return (
                                 <div className="flex w-full rounded-lg border border-slate-200 bg-white overflow-hidden focus-within:border-green-500 focus-within:ring-1 focus-within:ring-green-500 transition-shadow shadow-sm">
-                                  <input name={inputName} type="number" step="any" className="w-full py-2 px-3 outline-none bg-transparent text-right" placeholder="0" required />
-                                  <div className="flex items-center justify-center bg-slate-50 px-3 border-l border-slate-200 text-slate-500 font-bold text-xs select-none min-w-[3.5rem]">
+                                  <input name={inputName} type="number" step="any" className="w-full py-2 px-3 outline-none bg-transparent text-right min-w-0" placeholder="0" required />
+                                  <div className="flex items-center justify-center bg-slate-50 px-4 border-l border-slate-200 text-slate-500 font-bold text-xs select-none shrink-0 whitespace-nowrap">
                                     {type}
                                   </div>
                                 </div>
