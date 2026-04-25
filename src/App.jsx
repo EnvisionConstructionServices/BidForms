@@ -214,30 +214,45 @@ const App = () => {
                         </div>
                         {item.type !== 'SUBHEADER' && !item.isBold && (
                           <div className="md:w-64 shrink-0 flex items-center gap-2">
-                            {type === 'YES/NO' || type === 'Y/N' ? (
-                              <select name={inputName} className="w-full border p-2 rounded text-center focus:ring-2 focus:ring-green-500 outline-none bg-white" required>
-                                <option value="">Select...</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                              </select>
-                            ) : ['$', 'TOTAL', 'P&P', 'TAX'].includes(type) ? (
-                              <div className="relative w-full">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">$</span>
-                                <input name={inputName} type="number" step="0.01" className="w-full border p-2 pl-8 rounded text-left focus:ring-2 focus:ring-green-500 outline-none" placeholder="0.00" required />
-                              </div>
-                            ) : type === '%' ? (
-                              <div className="relative w-full">
-                                <input name={inputName} type="number" step="0.01" className="w-full border p-2 pr-8 rounded text-right focus:ring-2 focus:ring-green-500 outline-none" placeholder="0" required />
-                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">%</span>
-                              </div>
-                            ) : ['DAYS', 'WEEKS', 'PERSONNEL', 'SF', 'LF', 'EA', 'SY', 'CY', 'TN', 'LS', 'MH', 'TONS'].includes(type) ? (
-                              <div className="flex w-full items-center gap-2">
-                                <input name={inputName} type="number" step="any" className="w-full border p-2 rounded text-center focus:ring-2 focus:ring-green-500 outline-none" placeholder="0" required />
-                                <span className="text-slate-500 text-sm font-bold w-12 shrink-0">{type}</span>
-                              </div>
-                            ) : (
-                              <input name={inputName} type="text" className="w-full border p-2 rounded text-center focus:ring-2 focus:ring-green-500 outline-none" placeholder="Response" required />
-                            )}
+                            {(() => {
+                              if (type === 'Y/N/NA' || type === 'Y/N' || type === 'YES/NO') {
+                                return (
+                                  <div className="flex gap-4 items-center justify-center w-full h-full min-h-[42px]">
+                                    {['Yes', 'No', 'N/A'].map(opt => (
+                                      <label key={opt} className="flex items-center gap-1 cursor-pointer">
+                                        <input type="radio" name={inputName} value={opt} required className="accent-green-600 w-4 h-4" />
+                                        <span className="text-sm font-medium text-slate-700">{opt}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                );
+                              }
+                              if (type === '$' || type === 'TOTAL' || type === 'P&P' || type === 'TAX') {
+                                return (
+                                  <div className="relative w-full">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">$</span>
+                                    <input name={inputName} type="number" step="0.01" className="w-full border p-2 pl-8 rounded text-left focus:ring-2 focus:ring-green-500 outline-none" placeholder="0.00" required />
+                                  </div>
+                                );
+                              }
+                              if (type === 'EMAIL') {
+                                return <input name={inputName} type="email" className="w-full border p-2 rounded text-center focus:ring-2 focus:ring-green-500 outline-none" placeholder="Email Address" required />;
+                              }
+                              if (type === 'PHONE') {
+                                return <input name={inputName} type="tel" className="w-full border p-2 rounded text-center focus:ring-2 focus:ring-green-500 outline-none" placeholder="Phone Number" required />;
+                              }
+                              if (type === 'TEXT' || type === '') {
+                                return <input name={inputName} type="text" className="w-full border p-2 rounded text-center focus:ring-2 focus:ring-green-500 outline-none" placeholder="Response" required />;
+                              }
+                              
+                              // Default: Treat as a suffix appended to the response value
+                              return (
+                                <div className="flex w-full items-center gap-2">
+                                  <input name={inputName} type="number" step="any" className="w-full border p-2 rounded text-center focus:ring-2 focus:ring-green-500 outline-none" placeholder="0" required />
+                                  <span className="text-slate-500 text-sm font-bold shrink-0">{type}</span>
+                                </div>
+                              );
+                            })()}
                           </div>
                         )}
                       </div>
