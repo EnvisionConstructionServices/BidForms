@@ -288,7 +288,7 @@ const App = () => {
   if (view === 'loading' || view === 'loading-scope') return <div className="p-20 text-center animate-pulse text-slate-400">Loading Secure Bid Data...</div>;
 
   return (
-    <div className="w-full px-2 md:px-4 py-6 font-sans text-slate-800 relative">
+    <div className="max-w-4xl mx-auto px-4 md:px-8 py-8 font-sans text-slate-800 relative">
       
       {/* CUSTOM MODAL OVERLAY */}
       {modalData && (
@@ -353,7 +353,7 @@ const App = () => {
       )}
 
       {view === 'form' && (
-        <div className="pb-20 max-w-5xl mx-auto">
+        <div className="pb-20">
           <button onClick={() => setView('landing')} className="mb-4 text-slate-500 font-bold hover:text-slate-800 flex items-center gap-1">
             ← Back to Scopes
           </button>
@@ -534,9 +534,9 @@ const App = () => {
                       <button 
                         type="button" 
                         onClick={() => handleAddComment(header)} 
-                        className="text-sky-600 hover:text-sky-800 transition-colors flex items-center gap-1 text-xs font-bold mt-1"
+                        className="text-sky-600 hover:text-sky-800 transition-colors flex items-center gap-1.5 text-sm font-bold mt-1"
                       >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/></svg>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/></svg>
                         Add Comment / Clarification
                       </button>
                     </div>
@@ -544,6 +544,31 @@ const App = () => {
                 );
               });
             })()}
+
+            {/* Subtle W/MDBE Participation Section */}
+            <div className="bg-slate-50 rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-6 mt-4">
+              <div className="p-4 flex flex-col md:flex-row gap-4 items-center">
+                <div className="flex-1">
+                  <h3 className="font-bold text-slate-600 text-sm">W/MDBE Participation</h3>
+                  <p className="text-xs text-slate-500 mt-1">Is there any W/MDBE Participation included in your proposal value? If so, how much?</p>
+                </div>
+                <div className="w-full md:w-48 shrink-0">
+                  <div className="flex w-full rounded-lg border border-slate-200 bg-white overflow-hidden focus-within:border-green-500 focus-within:ring-1 focus-within:ring-green-500 transition-shadow shadow-sm">
+                    <input 
+                      name="wmdbe_percentage" 
+                      type="number" 
+                      step="0.01" 
+                      defaultValue={savedDraft?.wmdbe_percentage || ''} 
+                      className="w-full py-2 px-3 outline-none bg-transparent text-right min-w-0 text-sm" 
+                      placeholder="0" 
+                    />
+                    <div className="flex items-center justify-center bg-slate-50 px-3 border-l border-slate-200 text-slate-500 font-bold text-xs select-none shrink-0">
+                      %
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
             
             <div className="p-6 bg-slate-100 rounded-xl flex flex-col md:flex-row gap-6 items-center border border-slate-200">
               <div className="flex-1">
