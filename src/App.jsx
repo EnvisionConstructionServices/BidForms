@@ -5,7 +5,6 @@ import { createRoot } from 'react-dom/client';
  * ============================================================================
  * INDEXED DB HELPER (LOCAL AUTOSAVE)
  * ============================================================================
- * Safely stores form drafts persistently in the browser across sessions/refreshes.
  */
 const DB_NAME = 'BidFormsDB';
 const STORE_NAME = 'drafts';
@@ -65,6 +64,8 @@ const App = () => {
   const [savedDraft, setSavedDraft] = useState({});
   const [logos, setLogos] = useState({ main: '', wmdbe: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [modalData, setModalData] = useState(null);
+  const [toggledComments, setToggledComments] = useState({}); // Tracks which comment boxes are open
   const debounceTimer = useRef(null);
 
   const apiGet = async (baseUrl, params) => {
@@ -118,10 +119,7 @@ const App = () => {
   const loadScopeForm = async (scopeName) => {
     setView('loading-scope');
     try {
-      // Load form structure from backend
       const data = await apiGet(gasUrl, { action: 'getBidFormData', scopeName });
-      
-      // Load saved draft from local database (if any exists)
       const draft = await getDraft(scopeName) || {};
       
       setFormData(data);
@@ -133,7 +131,6 @@ const App = () => {
     }
   };
 
-  // Silently autosave form changes to IndexedDB
   const handleFormChange = (e) => {
     const formEl = e.currentTarget;
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
@@ -149,7 +146,7 @@ const App = () => {
         }
       });
       await saveDraft(formData.scopeName, draftData);
-    }, 800); // Wait 800ms after they stop typing to save
+    }, 800); 
   };
 
   const handleClearDraft = async () => {
@@ -157,6 +154,7 @@ const App = () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       await clearDraft(formData.scopeName);
       setSavedDraft({});
+      setToggledComments({});
       document.getElementById('bid-form').reset();
     }
   };
@@ -167,6 +165,7 @@ const App = () => {
     
     const formEl = e.target;
     const submissionData = {};
+    
     new FormData(formEl).forEach((value, key) => {
       if (submissionData[key]) {
         if (!Array.isArray(submissionData[key])) submissionData[key] = [submissionData[key]];
@@ -188,14 +187,19 @@ const App = () => {
         formData: { ...submissionData, scopeName: formData.scopeName, uploadedFileId }
       });
       
-      // Clear the local draft upon successful submission
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       await clearDraft(formData.scopeName);
       
-      alert(result.message || "Submitted Successfully");
-      setView('landing');
+      setModalData({ 
+        status: result.status || 'success', 
+        message: result.message || 'Submitted Successfully' 
+      });
+      
     } catch (err) {
-      alert("Submission Error: " + err.message);
+      setModalData({ 
+        status: 'error', 
+        message: "Submission Error: " + err.message 
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -216,11 +220,19 @@ const App = () => {
           await apiPost(gasUrl, 'uploadChunk', { fileId, chunk });
         }
 
-        const finalId = await apiPost(gasUrl, 'finalizeUpload', { fileId, mimeType: file.type, finalName: file.name });
+        const { id: finalId } = await apiPost(gasUrl, 'finalizeUpload', { fileId, mimeType: file.type, finalName: file.name });
         resolve(finalId);
       };
       reader.readAsDataURL(file);
     });
+  };
+
+  const handleCloseModal = () => {
+    const wasSuccess = modalData?.status === 'success';
+    setModalData(null);
+    if (wasSuccess) {
+      setView('landing');
+    }
   };
 
   if (view === 'no-config') {
@@ -243,7 +255,36 @@ const App = () => {
   if (view === 'loading' || view === 'loading-scope') return <div className="p-20 text-center animate-pulse text-slate-400">Loading Secure Bid Data...</div>;
 
   return (
-    <div className="w-full px-2 md:px-4 py-6 font-sans text-slate-800">
+    <div className="w-full px-2 md:px-4 py-6 font-sans text-slate-800 relative">
+      
+      {/* CUSTOM MODAL OVERLAY */}
+      {modalData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 transform transition-all border border-slate-100">
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 ${modalData.status === 'success' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+              {modalData.status === 'success' ? (
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
+              ) : (
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"></path></svg>
+              )}
+            </div>
+            <h3 className="text-2xl font-bold text-center mb-4 text-slate-800">
+              {modalData.status === 'success' ? 'Success!' : 'Oops!'}
+            </h3>
+            <div 
+              className="text-center text-slate-600 mb-8 leading-relaxed" 
+              dangerouslySetInnerHTML={{ __html: modalData.message }} 
+            />
+            <button 
+              onClick={handleCloseModal} 
+              className="w-full bg-slate-800 text-white font-bold py-3 px-4 rounded-xl hover:bg-slate-700 transition-colors shadow-md"
+            >
+              {modalData.status === 'success' ? 'Return to Dashboard' : 'Close and Try Again'}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-center mb-8">
         {logos.main && <img src={logos.main} className="h-16" alt="Logo" />}
       </div>
@@ -285,7 +326,6 @@ const App = () => {
           </button>
           <h1 className="text-3xl font-bold mb-6">Bid Form: {formData.scopeName}</h1>
           
-          {/* Draft Restored Banner */}
           {Object.keys(savedDraft).length > 0 && (
             <div className="bg-sky-50 text-sky-800 p-4 rounded-xl shadow-sm mb-6 flex flex-col sm:flex-row justify-between items-center text-sm font-semibold border border-sky-200 gap-4">
               <span className="flex items-center gap-2">
@@ -304,7 +344,6 @@ const App = () => {
 
           <form id="bid-form" onSubmit={handleFormSubmit} onChange={handleFormChange} className="space-y-8">
             {(() => {
-              // Track duplicate names accurately for Draft arrays (like the GAS backend does)
               const nameTracker = {};
               
               return formData.orderedHeaders.map((header, index) => (
@@ -316,11 +355,16 @@ const App = () => {
                       const type = (item.type || '').toUpperCase();
                       const inputName = `${item.number ? String(item.number).replace(/[^a-zA-Z0-9]/g, '_') : 'field'}_${(item.type || 'text').toLowerCase()}`;
                       
-                      // Calculate Array Index for Draft Restoring
-                      nameTracker[inputName] = (nameTracker[inputName] || 0) + 1;
-                      const arrayIndex = nameTracker[inputName] - 1;
+                      const secKey = header.replace(/[^a-zA-Z0-9]/g, '_');
+                      const commentRefName = `${secKey}_comment_ref`;
+                      const commentTextName = `${secKey}_comment_text`;
                       
                       let draftValue = '';
+                      let draftCommentText = '';
+
+                      // Tracker logic for main inputs
+                      nameTracker[inputName] = (nameTracker[inputName] || 0) + 1;
+                      const arrayIndex = nameTracker[inputName] - 1;
                       if (savedDraft?.[inputName]) {
                          if (Array.isArray(savedDraft[inputName])) {
                              draftValue = savedDraft[inputName][arrayIndex] || '';
@@ -329,66 +373,128 @@ const App = () => {
                          }
                       }
                       
+                      // Tracker logic for comment arrays
+                      if (item.type !== 'SUBHEADER' && !item.isBold) {
+                         nameTracker[commentRefName] = (nameTracker[commentRefName] || 0) + 1;
+                         const commentRefIndex = nameTracker[commentRefName] - 1;
+                         
+                         nameTracker[commentTextName] = (nameTracker[commentTextName] || 0) + 1;
+                         const commentTextIndex = nameTracker[commentTextName] - 1;
+                         
+                         if (savedDraft?.[commentTextName]) {
+                             if (Array.isArray(savedDraft[commentTextName])) {
+                                 draftCommentText = savedDraft[commentTextName][commentTextIndex] || '';
+                             } else {
+                                 if (commentTextIndex === 0) draftCommentText = savedDraft[commentTextName];
+                             }
+                         }
+                      }
+
+                      // Determine if the comment box should be open
+                      const toggleCommentKey = `${header}_${item.number}`;
+                      const isOpen = toggledComments[toggleCommentKey] ?? !!draftCommentText;
+                      
                       return (
-                        <div key={idx} className={`flex flex-col md:flex-row gap-4 py-2 border-b border-slate-50 last:border-0 ${item.type === 'SUBHEADER' ? 'bg-slate-50 -mx-4 px-4 py-3 font-bold italic text-slate-400' : ''}`}>
-                          <div className="flex-1">
-                            <span className="text-slate-400 text-xs mr-3 font-mono">{item.number}</span>
-                            <span dangerouslySetInnerHTML={{ __html: item.description }} />
-                          </div>
-                          {item.type !== 'SUBHEADER' && !item.isBold && (
-                            <div className="md:w-64 shrink-0 flex items-center gap-2">
-                              {(() => {
-                                if (type === 'Y/N/NA' || type === 'Y/N' || type === 'YES/NO') {
-                                  const options = type === 'Y/N/NA' ? ['Yes', 'No', 'N/A'] : ['Yes', 'No'];
-                                  return (
-                                    <div className="flex gap-2 items-center justify-center w-full h-full min-h-[42px]">
-                                      {options.map(opt => {
-                                        let activeClass = '';
-                                        if (opt === 'Yes') activeClass = 'peer-checked:bg-green-600 peer-checked:text-white peer-checked:border-green-600';
-                                        else if (opt === 'No') activeClass = 'peer-checked:bg-red-500 peer-checked:text-white peer-checked:border-red-500';
-                                        else activeClass = 'peer-checked:bg-slate-500 peer-checked:text-white peer-checked:border-slate-500';
-                                        
-                                        return (
-                                          <label key={opt} className="flex-1 cursor-pointer">
-                                            <input type="radio" name={inputName} value={opt} defaultChecked={draftValue === opt} required className="peer sr-only" />
-                                            <div className={`text-center px-2 py-2 text-sm font-bold rounded-lg border-2 border-slate-100 bg-slate-50 text-slate-400 transition-all hover:bg-slate-200 ${activeClass}`}>
-                                              {opt}
-                                            </div>
-                                          </label>
-                                        );
-                                      })}
-                                    </div>
-                                  );
-                                }
-                                if (type === '$' || type === 'TOTAL' || type === 'P&P' || type === 'TAX') {
-                                  return (
-                                    <div className="flex w-full rounded-lg border border-slate-200 bg-white overflow-hidden focus-within:border-green-500 focus-within:ring-1 focus-within:ring-green-500 transition-shadow shadow-sm">
-                                      <div className="flex items-center justify-center bg-slate-50 px-3 border-r border-slate-200 text-slate-500 font-semibold select-none">$</div>
-                                      <input name={inputName} type="number" step="0.01" defaultValue={draftValue} className="w-full py-2 px-3 outline-none bg-transparent text-left" placeholder="0.00" required />
-                                    </div>
-                                  );
-                                }
-                                if (type === 'EMAIL') {
-                                  return <input name={inputName} type="email" defaultValue={draftValue} className="w-full border border-slate-200 rounded-lg py-2 px-3 text-center focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none shadow-sm transition-shadow" placeholder="Email Address" required />;
-                                }
-                                if (type === 'PHONE') {
-                                  return <input name={inputName} type="tel" defaultValue={draftValue} className="w-full border border-slate-200 rounded-lg py-2 px-3 text-center focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none shadow-sm transition-shadow" placeholder="Phone Number" required />;
-                                }
-                                if (type === 'TEXT' || type === '') {
-                                  return <input name={inputName} type="text" defaultValue={draftValue} className="w-full border border-slate-200 rounded-lg py-2 px-3 text-center focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none shadow-sm transition-shadow" placeholder="Response" required />;
-                                }
+                        <div key={idx} className={`flex flex-col py-3 border-b border-slate-50 last:border-0 ${item.type === 'SUBHEADER' ? 'bg-slate-50 -mx-4 px-4 py-3 font-bold italic text-slate-400' : ''}`}>
+                          
+                          {/* Top Row: Description & Response Box */}
+                          <div className="flex flex-col md:flex-row gap-4 w-full items-start md:items-center">
+                            <div className="flex-1 flex items-start">
+                              <span className="text-slate-400 text-xs mr-3 font-mono mt-[2px]">{item.number}</span>
+                              <span dangerouslySetInnerHTML={{ __html: item.description }} />
+                            </div>
+                            
+                            {item.type !== 'SUBHEADER' && !item.isBold && (
+                              <div className="w-full md:w-[320px] shrink-0 flex items-start gap-2">
+                                <div className="flex-1">
+                                  {(() => {
+                                    if (type === 'Y/N/NA' || type === 'Y/N' || type === 'YES/NO') {
+                                      const options = type === 'Y/N/NA' ? ['Yes', 'No', 'N/A'] : ['Yes', 'No'];
+                                      return (
+                                        <div className="flex gap-2 items-center justify-center w-full h-[42px]">
+                                          {options.map(opt => {
+                                            let activeClass = '';
+                                            if (opt === 'Yes') activeClass = 'peer-checked:bg-green-600 peer-checked:text-white peer-checked:border-green-600';
+                                            else if (opt === 'No') activeClass = 'peer-checked:bg-red-500 peer-checked:text-white peer-checked:border-red-500';
+                                            else activeClass = 'peer-checked:bg-slate-500 peer-checked:text-white peer-checked:border-slate-500';
+                                            
+                                            return (
+                                              <label key={opt} className="flex-1 cursor-pointer">
+                                                <input type="radio" name={inputName} value={opt} defaultChecked={draftValue === opt} required className="peer sr-only" />
+                                                <div className={`text-center px-2 py-2 text-sm font-bold rounded-lg border-2 border-slate-100 bg-slate-50 text-slate-400 transition-all hover:bg-slate-200 ${activeClass}`}>
+                                                  {opt}
+                                                </div>
+                                              </label>
+                                            );
+                                          })}
+                                        </div>
+                                      );
+                                    }
+                                    if (type === '$' || type === 'TOTAL' || type === 'P&P' || type === 'TAX') {
+                                      return (
+                                        <div className="flex w-full h-[42px] rounded-lg border border-slate-200 bg-white overflow-hidden focus-within:border-green-500 focus-within:ring-1 focus-within:ring-green-500 transition-shadow shadow-sm">
+                                          <div className="flex items-center justify-center bg-slate-50 px-3 border-r border-slate-200 text-slate-500 font-semibold select-none">$</div>
+                                          <input name={inputName} type="number" step="0.01" defaultValue={draftValue} className="w-full py-2 px-3 outline-none bg-transparent text-left" placeholder="0.00" required />
+                                        </div>
+                                      );
+                                    }
+                                    if (type === 'EMAIL') {
+                                      return <input name={inputName} type="email" defaultValue={draftValue} className="w-full h-[42px] border border-slate-200 rounded-lg py-2 px-3 text-center focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none shadow-sm transition-shadow" placeholder="Email Address" required />;
+                                    }
+                                    if (type === 'PHONE') {
+                                      return <input name={inputName} type="tel" defaultValue={draftValue} className="w-full h-[42px] border border-slate-200 rounded-lg py-2 px-3 text-center focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none shadow-sm transition-shadow" placeholder="Phone Number" required />;
+                                    }
+                                    if (type === 'TEXT' || type === '') {
+                                      return <input name={inputName} type="text" defaultValue={draftValue} className="w-full h-[42px] border border-slate-200 rounded-lg py-2 px-3 text-center focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none shadow-sm transition-shadow" placeholder="Response" required />;
+                                    }
+                                    
+                                    return (
+                                      <div className="flex w-full h-[42px] rounded-lg border border-slate-200 bg-white overflow-hidden focus-within:border-green-500 focus-within:ring-1 focus-within:ring-green-500 transition-shadow shadow-sm">
+                                        <input name={inputName} type="number" step="any" defaultValue={draftValue} className="w-full py-2 px-3 outline-none bg-transparent text-right min-w-0" placeholder="0" required />
+                                        <div className="flex items-center justify-center bg-slate-50 px-4 border-l border-slate-200 text-slate-500 font-bold text-xs select-none shrink-0 whitespace-nowrap">
+                                          {type}
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
                                 
-                                return (
-                                  <div className="flex w-full rounded-lg border border-slate-200 bg-white overflow-hidden focus-within:border-green-500 focus-within:ring-1 focus-within:ring-green-500 transition-shadow shadow-sm">
-                                    <input name={inputName} type="number" step="any" defaultValue={draftValue} className="w-full py-2 px-3 outline-none bg-transparent text-right min-w-0" placeholder="0" required />
-                                    <div className="flex items-center justify-center bg-slate-50 px-4 border-l border-slate-200 text-slate-500 font-bold text-xs select-none shrink-0 whitespace-nowrap">
-                                      {type}
-                                    </div>
-                                  </div>
-                                );
-                              })()}
+                                {/* Toggle Comment Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => setToggledComments(prev => ({ ...prev, [toggleCommentKey]: !isOpen }))}
+                                  className={`w-[42px] h-[42px] rounded-lg border flex items-center justify-center transition-all shrink-0 shadow-sm outline-none ${isOpen ? 'bg-sky-50 text-sky-600 border-sky-300' : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50 hover:text-slate-600 hover:border-slate-300'}`}
+                                  title={isOpen ? "Remove Comment" : "Add Comment/Clarification"}
+                                >
+                                  {isOpen ? (
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M20 12H4"/></svg>
+                                  ) : (
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/></svg>
+                                  )}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Hidden/Shown Comment Box */}
+                          {item.type !== 'SUBHEADER' && !item.isBold && (
+                            <div className={`w-full mt-3 pl-6 md:pl-8 pr-1 ${isOpen ? 'block' : 'hidden'}`}>
+                              <div className="relative">
+                                {/* Decorative Left Border Accent */}
+                                <div className="absolute top-0 left-0 w-1 h-full bg-sky-400 rounded-l-md"></div>
+                                
+                                {/* Data payload elements */}
+                                <input type="hidden" name={commentRefName} value={item.number} />
+                                <textarea
+                                  name={commentTextName}
+                                  defaultValue={draftCommentText}
+                                  placeholder="Add a comment or clarification..."
+                                  className="w-full bg-sky-50 border border-sky-100 rounded-lg p-3 pl-5 text-sm text-sky-900 placeholder-sky-400 focus:outline-none focus:border-sky-300 focus:ring-1 focus:ring-sky-300 resize-y min-h-[60px] shadow-inner transition-colors"
+                                />
+                              </div>
                             </div>
                           )}
+
                         </div>
                       );
                     })}
