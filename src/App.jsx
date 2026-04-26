@@ -1,21 +1,71 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 
 /**
  * ============================================================================
- * FRONTEND REACT APPLICATION (UNIVERSAL VERSION)
+ * INDEXED DB HELPER (LOCAL AUTOSAVE)
  * ============================================================================
- * This version reconstructs the Google Apps Script URL from the 'id' parameter.
- * Example URL: https://your-user.github.io/BidForms/?project=Main-Street&id=AKfyc...
+ * Safely stores form drafts persistently in the browser across sessions/refreshes.
  */
+const DB_NAME = 'BidFormsDB';
+const STORE_NAME = 'drafts';
 
+const initDB = () => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = (e) => {
+      if (!e.target.result.objectStoreNames.contains(STORE_NAME)) {
+        e.target.result.createObjectStore(STORE_NAME);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+};
+
+const saveDraft = async (scope, data) => {
+  try {
+    const db = await initDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).put(data, scope);
+  } catch (e) { console.error("Draft save failed", e); }
+};
+
+const getDraft = async (scope) => {
+  try {
+    const db = await initDB();
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const request = tx.objectStore(STORE_NAME).get(scope);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => resolve(null);
+    });
+  } catch (e) { return null; }
+};
+
+const clearDraft = async (scope) => {
+  try {
+    const db = await initDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).delete(scope);
+  } catch (e) { console.error("Draft clear failed", e); }
+};
+
+
+/**
+ * ============================================================================
+ * FRONTEND REACT APPLICATION
+ * ============================================================================
+ */
 const App = () => {
   const [view, setView] = useState('loading');
   const [gasUrl, setGasUrl] = useState(null); 
   const [initialData, setInitialData] = useState(null);
   const [formData, setFormData] = useState(null);
+  const [savedDraft, setSavedDraft] = useState({});
   const [logos, setLogos] = useState({ main: '', wmdbe: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const debounceTimer = useRef(null);
 
   const apiGet = async (baseUrl, params) => {
     const query = new URLSearchParams(params).toString();
@@ -33,7 +83,6 @@ const App = () => {
   };
 
   useEffect(() => {
-    // 1. Detect the Script ID from the browser's address bar
     const urlParams = new URLSearchParams(window.location.search);
     const scriptId = urlParams.get('id');
 
@@ -42,21 +91,17 @@ const App = () => {
       return;
     }
 
-    // RECONSTRUCT FULL BACKEND URL BEHIND THE SCENES
     const backendUrl = `https://script.google.com/macros/s/${scriptId}/exec`;
     setGasUrl(backendUrl);
 
-    // 2. Fetch data from the reconstructed backend URL
     const initData = async () => {
       try {
         const data = await apiGet(backendUrl, { action: 'getInitialData' });
         setInitialData(data);
         
-        // Update the browser tab title dynamically
         const projectName = data.projectInfo?.[0]?.value || "Project";
         document.title = `Envision CS - ${projectName} Bid Forms`;
         
-        // Fetch logos
         apiGet(backendUrl, { action: 'getMainLogo' }).then(url => setLogos(prev => ({ ...prev, main: url })));
         apiGet(backendUrl, { action: 'getDriveImage', fileId: '1CyxISCVHpHmRg6GsXVCc2xaSNP-teXzY' }).then(url => setLogos(prev => ({ ...prev, wmdbe: url })));
         
@@ -73,12 +118,46 @@ const App = () => {
   const loadScopeForm = async (scopeName) => {
     setView('loading-scope');
     try {
+      // Load form structure from backend
       const data = await apiGet(gasUrl, { action: 'getBidFormData', scopeName });
+      
+      // Load saved draft from local database (if any exists)
+      const draft = await getDraft(scopeName) || {};
+      
       setFormData(data);
+      setSavedDraft(draft);
       setView('form');
     } catch (err) {
       alert("Failed to load form");
       setView('landing');
+    }
+  };
+
+  // Silently autosave form changes to IndexedDB
+  const handleFormChange = (e) => {
+    const formEl = e.currentTarget;
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    
+    debounceTimer.current = setTimeout(async () => {
+      const draftData = {};
+      new FormData(formEl).forEach((value, key) => {
+        if (draftData[key]) {
+          if (!Array.isArray(draftData[key])) draftData[key] = [draftData[key]];
+          draftData[key].push(value);
+        } else {
+          draftData[key] = value;
+        }
+      });
+      await saveDraft(formData.scopeName, draftData);
+    }, 800); // Wait 800ms after they stop typing to save
+  };
+
+  const handleClearDraft = async () => {
+    if (window.confirm("Are you sure you want to clear your saved progress and start over?")) {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+      await clearDraft(formData.scopeName);
+      setSavedDraft({});
+      document.getElementById('bid-form').reset();
     }
   };
 
@@ -108,6 +187,11 @@ const App = () => {
       const result = await apiPost(gasUrl, 'saveBidSubmission', {
         formData: { ...submissionData, scopeName: formData.scopeName, uploadedFileId }
       });
+      
+      // Clear the local draft upon successful submission
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+      await clearDraft(formData.scopeName);
+      
       alert(result.message || "Submitted Successfully");
       setView('landing');
     } catch (err) {
@@ -165,7 +249,7 @@ const App = () => {
       </div>
 
       {view === 'landing' && (
-        <div className="space-y-6">
+        <div className="max-w-4xl mx-auto space-y-6">
           <div className="bg-white p-6 rounded-xl shadow-md border border-slate-200">
             <h1 className="text-2xl font-bold mb-4">{initialData.projectInfo[0]?.value}</h1>
             <div className="space-y-2">
@@ -195,98 +279,123 @@ const App = () => {
       )}
 
       {view === 'form' && (
-        <div className="pb-20">
+        <div className="pb-20 max-w-5xl mx-auto">
           <button onClick={() => setView('landing')} className="mb-4 text-slate-500 font-bold hover:text-slate-800 flex items-center gap-1">
             ← Back to Scopes
           </button>
           <h1 className="text-3xl font-bold mb-6">Bid Form: {formData.scopeName}</h1>
-          <form onSubmit={handleFormSubmit} className="space-y-8">
-            {formData.orderedHeaders.map((header, index) => (
-              <div key={header} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                {/* Dedicated Accent Bar */}
-                <div style={{ height: '6px', backgroundColor: index % 2 === 0 ? '#59BA48' : '#1B95D2' }} />
-                
-                <h2 className="bg-slate-800 text-white p-3 font-bold">
-                  {header}
-                </h2>
-                <div className="p-4 space-y-4">
-                  {formData.sections[header].map((item, idx) => {
-                    const type = (item.type || '').toUpperCase();
-                    // Ensures the name strictly matches the format expected by the GAS backend parser
-                    const inputName = `${item.number ? String(item.number).replace(/[^a-zA-Z0-9]/g, '_') : 'field'}_${(item.type || 'text').toLowerCase()}`;
-                    
-                    return (
-                      <div key={idx} className={`flex flex-col md:flex-row gap-4 py-2 border-b border-slate-50 last:border-0 ${item.type === 'SUBHEADER' ? 'bg-slate-50 -mx-4 px-4 py-3 font-bold italic text-slate-400' : ''}`}>
-                        <div className="flex-1">
-                          <span className="text-slate-400 text-xs mr-3 font-mono">{item.number}</span>
-                          <span dangerouslySetInnerHTML={{ __html: item.description }} />
-                        </div>
-                        {item.type !== 'SUBHEADER' && !item.isBold && (
-                          <div className="md:w-64 shrink-0 flex items-center gap-2">
-                            {(() => {
-                              if (type === 'Y/N/NA' || type === 'Y/N' || type === 'YES/NO') {
-                                const options = type === 'Y/N/NA' ? ['Yes', 'No', 'N/A'] : ['Yes', 'No'];
-                                return (
-                                  <div className="flex gap-2 items-center justify-center w-full h-full min-h-[42px]">
-                                    {options.map(opt => {
-                                      // Determine the color based on the option
-                                      let activeClass = '';
-                                      if (opt === 'Yes') activeClass = 'peer-checked:bg-green-600 peer-checked:text-white peer-checked:border-green-600';
-                                      else if (opt === 'No') activeClass = 'peer-checked:bg-red-500 peer-checked:text-white peer-checked:border-red-500';
-                                      else activeClass = 'peer-checked:bg-slate-500 peer-checked:text-white peer-checked:border-slate-500';
-                                      
-                                      return (
-                                        <label key={opt} className="flex-1 cursor-pointer">
-                                          {/* Hidden Radio Button (peer) */}
-                                          <input type="radio" name={inputName} value={opt} required className="peer sr-only" />
-                                          {/* Visible Button */}
-                                          <div className={`text-center px-2 py-2 text-sm font-bold rounded-lg border-2 border-slate-100 bg-slate-50 text-slate-400 transition-all hover:bg-slate-200 ${activeClass}`}>
-                                            {opt}
-                                          </div>
-                                        </label>
-                                      );
-                                    })}
-                                  </div>
-                                );
-                              }
-                              if (type === '$' || type === 'TOTAL' || type === 'P&P' || type === 'TAX') {
+          
+          {/* Draft Restored Banner */}
+          {Object.keys(savedDraft).length > 0 && (
+            <div className="bg-sky-50 text-sky-800 p-4 rounded-xl shadow-sm mb-6 flex flex-col sm:flex-row justify-between items-center text-sm font-semibold border border-sky-200 gap-4">
+              <span className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                Your previous progress has been restored.
+              </span>
+              <button 
+                type="button" 
+                onClick={handleClearDraft}
+                className="text-sky-600 hover:text-sky-800 underline hover:bg-sky-100 px-3 py-1 rounded transition-colors"
+              >
+                Start Over
+              </button>
+            </div>
+          )}
+
+          <form id="bid-form" onSubmit={handleFormSubmit} onChange={handleFormChange} className="space-y-8">
+            {(() => {
+              // Track duplicate names accurately for Draft arrays (like the GAS backend does)
+              const nameTracker = {};
+              
+              return formData.orderedHeaders.map((header, index) => (
+                <div key={header} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div style={{ height: '6px', backgroundColor: index % 2 === 0 ? '#59BA48' : '#1B95D2' }} />
+                  <h2 className="bg-slate-800 text-white p-3 font-bold">{header}</h2>
+                  <div className="p-4 space-y-4">
+                    {formData.sections[header].map((item, idx) => {
+                      const type = (item.type || '').toUpperCase();
+                      const inputName = `${item.number ? String(item.number).replace(/[^a-zA-Z0-9]/g, '_') : 'field'}_${(item.type || 'text').toLowerCase()}`;
+                      
+                      // Calculate Array Index for Draft Restoring
+                      nameTracker[inputName] = (nameTracker[inputName] || 0) + 1;
+                      const arrayIndex = nameTracker[inputName] - 1;
+                      
+                      let draftValue = '';
+                      if (savedDraft?.[inputName]) {
+                         if (Array.isArray(savedDraft[inputName])) {
+                             draftValue = savedDraft[inputName][arrayIndex] || '';
+                         } else {
+                             if (arrayIndex === 0) draftValue = savedDraft[inputName];
+                         }
+                      }
+                      
+                      return (
+                        <div key={idx} className={`flex flex-col md:flex-row gap-4 py-2 border-b border-slate-50 last:border-0 ${item.type === 'SUBHEADER' ? 'bg-slate-50 -mx-4 px-4 py-3 font-bold italic text-slate-400' : ''}`}>
+                          <div className="flex-1">
+                            <span className="text-slate-400 text-xs mr-3 font-mono">{item.number}</span>
+                            <span dangerouslySetInnerHTML={{ __html: item.description }} />
+                          </div>
+                          {item.type !== 'SUBHEADER' && !item.isBold && (
+                            <div className="md:w-64 shrink-0 flex items-center gap-2">
+                              {(() => {
+                                if (type === 'Y/N/NA' || type === 'Y/N' || type === 'YES/NO') {
+                                  const options = type === 'Y/N/NA' ? ['Yes', 'No', 'N/A'] : ['Yes', 'No'];
+                                  return (
+                                    <div className="flex gap-2 items-center justify-center w-full h-full min-h-[42px]">
+                                      {options.map(opt => {
+                                        let activeClass = '';
+                                        if (opt === 'Yes') activeClass = 'peer-checked:bg-green-600 peer-checked:text-white peer-checked:border-green-600';
+                                        else if (opt === 'No') activeClass = 'peer-checked:bg-red-500 peer-checked:text-white peer-checked:border-red-500';
+                                        else activeClass = 'peer-checked:bg-slate-500 peer-checked:text-white peer-checked:border-slate-500';
+                                        
+                                        return (
+                                          <label key={opt} className="flex-1 cursor-pointer">
+                                            <input type="radio" name={inputName} value={opt} defaultChecked={draftValue === opt} required className="peer sr-only" />
+                                            <div className={`text-center px-2 py-2 text-sm font-bold rounded-lg border-2 border-slate-100 bg-slate-50 text-slate-400 transition-all hover:bg-slate-200 ${activeClass}`}>
+                                              {opt}
+                                            </div>
+                                          </label>
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                }
+                                if (type === '$' || type === 'TOTAL' || type === 'P&P' || type === 'TAX') {
+                                  return (
+                                    <div className="flex w-full rounded-lg border border-slate-200 bg-white overflow-hidden focus-within:border-green-500 focus-within:ring-1 focus-within:ring-green-500 transition-shadow shadow-sm">
+                                      <div className="flex items-center justify-center bg-slate-50 px-3 border-r border-slate-200 text-slate-500 font-semibold select-none">$</div>
+                                      <input name={inputName} type="number" step="0.01" defaultValue={draftValue} className="w-full py-2 px-3 outline-none bg-transparent text-left" placeholder="0.00" required />
+                                    </div>
+                                  );
+                                }
+                                if (type === 'EMAIL') {
+                                  return <input name={inputName} type="email" defaultValue={draftValue} className="w-full border border-slate-200 rounded-lg py-2 px-3 text-center focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none shadow-sm transition-shadow" placeholder="Email Address" required />;
+                                }
+                                if (type === 'PHONE') {
+                                  return <input name={inputName} type="tel" defaultValue={draftValue} className="w-full border border-slate-200 rounded-lg py-2 px-3 text-center focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none shadow-sm transition-shadow" placeholder="Phone Number" required />;
+                                }
+                                if (type === 'TEXT' || type === '') {
+                                  return <input name={inputName} type="text" defaultValue={draftValue} className="w-full border border-slate-200 rounded-lg py-2 px-3 text-center focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none shadow-sm transition-shadow" placeholder="Response" required />;
+                                }
+                                
                                 return (
                                   <div className="flex w-full rounded-lg border border-slate-200 bg-white overflow-hidden focus-within:border-green-500 focus-within:ring-1 focus-within:ring-green-500 transition-shadow shadow-sm">
-                                    <div className="flex items-center justify-center bg-slate-50 px-3 border-r border-slate-200 text-slate-500 font-semibold select-none">
-                                      $
+                                    <input name={inputName} type="number" step="any" defaultValue={draftValue} className="w-full py-2 px-3 outline-none bg-transparent text-right min-w-0" placeholder="0" required />
+                                    <div className="flex items-center justify-center bg-slate-50 px-4 border-l border-slate-200 text-slate-500 font-bold text-xs select-none shrink-0 whitespace-nowrap">
+                                      {type}
                                     </div>
-                                    <input name={inputName} type="number" step="0.01" className="w-full py-2 px-3 outline-none bg-transparent text-left" placeholder="0.00" required />
                                   </div>
                                 );
-                              }
-                              if (type === 'EMAIL') {
-                                return <input name={inputName} type="email" className="w-full border border-slate-200 rounded-lg py-2 px-3 text-center focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none shadow-sm transition-shadow" placeholder="Email Address" required />;
-                              }
-                              if (type === 'PHONE') {
-                                return <input name={inputName} type="tel" className="w-full border border-slate-200 rounded-lg py-2 px-3 text-center focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none shadow-sm transition-shadow" placeholder="Phone Number" required />;
-                              }
-                              if (type === 'TEXT' || type === '') {
-                                return <input name={inputName} type="text" className="w-full border border-slate-200 rounded-lg py-2 px-3 text-center focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none shadow-sm transition-shadow" placeholder="Response" required />;
-                              }
-                              
-                              // Default: Treat as a suffix appended to the response value
-                              return (
-                                <div className="flex w-full rounded-lg border border-slate-200 bg-white overflow-hidden focus-within:border-green-500 focus-within:ring-1 focus-within:ring-green-500 transition-shadow shadow-sm">
-                                  <input name={inputName} type="number" step="any" className="w-full py-2 px-3 outline-none bg-transparent text-right min-w-0" placeholder="0" required />
-                                  <div className="flex items-center justify-center bg-slate-50 px-4 border-l border-slate-200 text-slate-500 font-bold text-xs select-none shrink-0 whitespace-nowrap">
-                                    {type}
-                                  </div>
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                              })()}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ));
+            })()}
             
             <div className="p-6 bg-slate-100 rounded-xl flex flex-col md:flex-row gap-6 items-center border border-slate-200">
               <div className="flex-1">
@@ -309,8 +418,4 @@ const App = () => {
   );
 };
 
-const container = document.getElementById('root');
-if (container) {
-  const root = createRoot(container);
-  root.render(<App />);
-}
+export default App;
