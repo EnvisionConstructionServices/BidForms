@@ -288,7 +288,7 @@ const App = () => {
   if (view === 'loading' || view === 'loading-scope') return <div className="p-20 text-center animate-pulse text-slate-400">Loading Secure Bid Data...</div>;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 md:px-8 py-8 font-sans text-slate-800 relative">
+    <div className="w-full px-4 md:px-6 lg:px-8 py-8 mx-auto font-sans text-slate-800 relative">
       
       {/* CUSTOM MODAL OVERLAY */}
       {modalData && (
