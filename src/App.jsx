@@ -473,7 +473,7 @@ const App = () => {
                     </div>
 
                     {/* DEDICATED SECTION COMMENTS AREA */}
-                    <div className="bg-slate-50 border-t border-slate-100 p-4 mt-auto">
+                    <div className="bg-slate-50 border-t border-slate-100 p-2 mt-auto">
                       {(sectionComments[header] || []).map((commentId, cIdx) => {
                         let draftRef = '';
                         let draftText = '';
@@ -488,15 +488,15 @@ const App = () => {
                         }
 
                         return (
-                          <div key={commentId} className="flex flex-col md:flex-row gap-3 mb-4 relative group">
-                            <div className="w-full md:w-28 shrink-0 relative">
-                              <div className="absolute top-0 left-0 w-1 h-full bg-sky-400 rounded-l-md"></div>
+                          <div key={commentId} className="flex flex-col md:flex-row gap-2 mb-2 relative group">
+                            <div className="w-full md:w-24 shrink-0 relative">
+                              <div className="absolute top-0 left-0 w-1 h-full bg-sky-400 rounded-l-[4px]"></div>
                               <input 
                                 name={commentRefName} 
                                 defaultValue={draftRef} 
                                 placeholder="Line No." 
                                 required 
-                                className="w-full bg-sky-50 border border-sky-100 rounded-r-lg py-2 pl-4 pr-3 focus:border-sky-300 focus:ring-1 focus:ring-sky-300 outline-none text-sm text-sky-900 placeholder-sky-400 shadow-inner" 
+                                className="w-full bg-sky-50 border border-sky-100 rounded-r py-1.5 pl-3 pr-2 focus:border-sky-300 focus:ring-1 focus:ring-sky-300 outline-none text-xs text-sky-900 placeholder-sky-400 shadow-inner" 
                               />
                             </div>
                             <div className="flex-1 relative">
@@ -505,7 +505,7 @@ const App = () => {
                                 defaultValue={draftText} 
                                 placeholder="Enter your comment or clarification here..." 
                                 required 
-                                className="w-full bg-sky-50 border border-sky-100 rounded-lg py-2 px-3 focus:border-sky-300 focus:ring-1 focus:ring-sky-300 outline-none text-sm text-sky-900 placeholder-sky-400 min-h-[40px] resize-y shadow-inner" 
+                                className="w-full bg-sky-50 border border-sky-100 rounded py-1.5 px-2 focus:border-sky-300 focus:ring-1 focus:ring-sky-300 outline-none text-xs text-sky-900 placeholder-sky-400 min-h-[32px] h-[32px] leading-tight resize-y shadow-inner" 
                               />
                             </div>
                             
@@ -513,17 +513,17 @@ const App = () => {
                             <button 
                               type="button" 
                               onClick={() => handleRemoveComment(header, commentId)} 
-                              className="md:absolute md:-right-3 md:-top-3 text-slate-400 hover:text-red-500 transition-colors bg-white rounded-full p-1.5 shadow-md border border-slate-100 hidden md:group-hover:block z-10" 
+                              className="md:absolute md:-right-2 md:-top-2 text-slate-400 hover:text-red-500 transition-colors bg-white rounded-full p-1 shadow-sm border border-slate-100 hidden md:group-hover:block z-10" 
                               title="Remove Comment"
                             >
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
                             </button>
                             
                             {/* Mobile Remove Button */}
                             <button 
                               type="button" 
                               onClick={() => handleRemoveComment(header, commentId)} 
-                              className="md:hidden text-red-400 hover:text-red-600 text-sm font-bold text-right w-full mb-2"
+                              className="md:hidden text-red-400 hover:text-red-600 text-xs font-bold text-right w-full mb-1"
                             >
                               Remove Comment
                             </button>
@@ -534,9 +534,9 @@ const App = () => {
                       <button 
                         type="button" 
                         onClick={() => handleAddComment(header)} 
-                        className="text-sky-600 hover:text-sky-800 transition-colors flex items-center gap-1.5 text-sm font-bold mt-1"
+                        className="text-sky-600 hover:text-sky-800 transition-colors flex items-center gap-1 text-xs font-bold mt-1"
                       >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/></svg>
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/></svg>
                         Add Comment / Clarification
                       </button>
                     </div>
