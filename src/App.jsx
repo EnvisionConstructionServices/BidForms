@@ -353,7 +353,7 @@ const App = () => {
       )}
 
       {view === 'form' && (
-        <div className="pb-20">
+        <div className="pb-20 w-full">
           <button onClick={() => setView('landing')} className="mb-4 text-slate-500 font-bold hover:text-slate-800 flex items-center gap-1">
             ← Back to Scopes
           </button>
