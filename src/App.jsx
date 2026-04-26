@@ -66,6 +66,7 @@ const App = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [modalData, setModalData] = useState(null);
   const [sectionComments, setSectionComments] = useState({}); // Tracks comment rows per section
+  const [uploadStatus, setUploadStatus] = useState({ uploading: false, fileId: null, fileName: null, error: null }); // Tracks background file uploads
   const debounceTimer = useRef(null);
 
   const apiGet = async (baseUrl, params) => {
@@ -138,6 +139,7 @@ const App = () => {
       setFormData(data);
       setSavedDraft(draft);
       setSectionComments(initComments);
+      setUploadStatus({ uploading: false, fileId: null, fileName: null, error: null }); // Reset upload status
       setView('form');
     } catch (err) {
       alert("Failed to load form");
@@ -169,6 +171,7 @@ const App = () => {
       await clearDraft(formData.scopeName);
       setSavedDraft({});
       setSectionComments({});
+      setUploadStatus({ uploading: false, fileId: null, fileName: null, error: null }); // Reset upload status
       document.getElementById('bid-form').reset();
     }
   };
@@ -192,8 +195,35 @@ const App = () => {
     }, 100);
   };
 
+  // Instantly begins uploading the file when selected
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) {
+      setUploadStatus({ uploading: false, fileId: null, fileName: null, error: null });
+      return;
+    }
+
+    setUploadStatus({ uploading: true, fileId: null, fileName: file.name, error: null });
+
+    try {
+      const finalId = await uploadFile(file);
+      setUploadStatus({ uploading: false, fileId: finalId, fileName: file.name, error: null });
+    } catch (err) {
+      console.error("Upload failed", err);
+      setUploadStatus({ uploading: false, fileId: null, fileName: file.name, error: err.message });
+      e.target.value = null; // Clear the input so they can try again
+    }
+  };
+
   const handleFormSubmit = async (e) => {
     e.preventDefault();
+    
+    // Safety check just in case they click submit while an upload is happening
+    if (uploadStatus.uploading) {
+      alert("Please wait for your proposal file to finish uploading.");
+      return;
+    }
+    
     setIsSubmitting(true);
     
     const formEl = e.target;
@@ -208,12 +238,8 @@ const App = () => {
       }
     });
 
-    const fileInput = document.getElementById('proposalUpload');
-    let uploadedFileId = null;
-    if (fileInput?.files.length > 0) {
-      const file = fileInput.files[0];
-      uploadedFileId = await uploadFile(file);
-    }
+    // Use the ID from the background upload process
+    const uploadedFileId = uploadStatus.fileId;
 
     try {
       const result = await apiPost(gasUrl, 'saveBidSubmission', {
@@ -424,8 +450,8 @@ const App = () => {
                         const fillInRegex = /\[TRADE PARTNER TO FILL IN\]/gi;
                         if (fillInRegex.test(descriptionHtml)) {
                             const escapedValue = (inlineDraftValue || '').replace(/"/g, '&quot;');
-                            // Removed "required", changed colors to slate/grey, and increased width drastically
-                            const inputHtml = `<input type="text" name="${inlineInputName}" value="${escapedValue}" placeholder="Enter item description..." class="mx-1 px-2 py-0.5 border-b-2 border-slate-300 focus:border-slate-500 outline-none bg-slate-100 focus:bg-slate-200 rounded-t w-[250px] md:w-[450px] max-w-full text-sm font-bold text-slate-700 placeholder-slate-400 transition-colors inline-block shadow-sm" />`;
+                            // Removed "required", changed colors to slate/grey, increased width drastically, and removed placeholder
+                            const inputHtml = `<input type="text" name="${inlineInputName}" value="${escapedValue}" class="mx-1 px-2 py-0.5 border-b-2 border-slate-300 focus:border-slate-500 outline-none bg-slate-100 focus:bg-slate-200 rounded-t w-[250px] md:w-[450px] max-w-full text-sm font-bold text-slate-700 transition-colors inline-block shadow-sm" />`;
                             descriptionHtml = descriptionHtml.replace(fillInRegex, inputHtml);
                         }
                         
@@ -465,23 +491,23 @@ const App = () => {
                                     return (
                                       <div className="flex w-full h-[42px] rounded-lg border border-slate-200 bg-white overflow-hidden focus-within:border-green-500 focus-within:ring-1 focus-within:ring-green-500 transition-shadow shadow-sm">
                                         <div className="flex items-center justify-center bg-slate-50 px-3 border-r border-slate-200 text-slate-500 font-semibold select-none">$</div>
-                                        <input name={inputName} type="number" step="0.01" defaultValue={draftValue} className="w-full py-2 px-3 outline-none bg-transparent text-left" placeholder="0.00" required />
+                                        <input name={inputName} type="number" step="0.01" defaultValue={draftValue} className="w-full py-2 px-3 outline-none bg-transparent text-left" required />
                                       </div>
                                     );
                                   }
                                   if (type === 'EMAIL') {
-                                    return <input name={inputName} type="email" defaultValue={draftValue} className="w-full h-[42px] border border-slate-200 rounded-lg py-2 px-3 text-center focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none shadow-sm transition-shadow" placeholder="Email Address" required />;
+                                    return <input name={inputName} type="email" defaultValue={draftValue} className="w-full h-[42px] border border-slate-200 rounded-lg py-2 px-3 text-center focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none shadow-sm transition-shadow" required />;
                                   }
                                   if (type === 'PHONE') {
-                                    return <input name={inputName} type="tel" defaultValue={draftValue} className="w-full h-[42px] border border-slate-200 rounded-lg py-2 px-3 text-center focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none shadow-sm transition-shadow" placeholder="Phone Number" required />;
+                                    return <input name={inputName} type="tel" defaultValue={draftValue} className="w-full h-[42px] border border-slate-200 rounded-lg py-2 px-3 text-center focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none shadow-sm transition-shadow" required />;
                                   }
                                   if (type === 'TEXT' || type === '') {
-                                    return <input name={inputName} type="text" defaultValue={draftValue} className="w-full h-[42px] border border-slate-200 rounded-lg py-2 px-3 text-center focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none shadow-sm transition-shadow" placeholder="Response" required />;
+                                    return <input name={inputName} type="text" defaultValue={draftValue} className="w-full h-[42px] border border-slate-200 rounded-lg py-2 px-3 text-center focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none shadow-sm transition-shadow" required />;
                                   }
                                   
                                   return (
                                     <div className="flex w-full h-[42px] rounded-lg border border-slate-200 bg-white overflow-hidden focus-within:border-green-500 focus-within:ring-1 focus-within:ring-green-500 transition-shadow shadow-sm">
-                                      <input name={inputName} type="number" step="any" defaultValue={draftValue} className="w-full py-2 px-3 outline-none bg-transparent text-right min-w-0" placeholder="0" required />
+                                      <input name={inputName} type="number" step="any" defaultValue={draftValue} className="w-full py-2 px-3 outline-none bg-transparent text-right min-w-0" required />
                                       <div className="flex items-center justify-center bg-slate-50 px-4 border-l border-slate-200 text-slate-500 font-bold text-xs select-none shrink-0 whitespace-nowrap">
                                         {type}
                                       </div>
@@ -583,7 +609,6 @@ const App = () => {
                       step="0.01" 
                       defaultValue={savedDraft?.wmdbe_percentage || ''} 
                       className="w-full py-2 px-3 outline-none bg-transparent text-right min-w-0 text-sm" 
-                      placeholder="0" 
                     />
                     <div className="flex items-center justify-center bg-slate-50 px-3 border-l border-slate-200 text-slate-500 font-bold text-xs select-none shrink-0">
                       %
@@ -597,14 +622,40 @@ const App = () => {
               <div className="flex-1">
                 <h3 className="font-bold text-slate-700">Proposal Upload</h3>
                 <p className="text-sm text-slate-500">Attach your formal letterhead proposal (PDF only).</p>
-                <input type="file" id="proposalUpload" className="mt-2 text-sm" accept=".pdf" />
+                <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-4">
+                  <input 
+                    type="file" 
+                    id="proposalUpload" 
+                    className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100 transition-colors" 
+                    accept=".pdf" 
+                    onChange={handleFileChange}
+                    disabled={uploadStatus.uploading || isSubmitting}
+                  />
+                  
+                  {/* Upload Status Indicators */}
+                  {uploadStatus.uploading && (
+                    <span className="text-sm font-bold text-sky-600 animate-pulse flex items-center gap-1.5">
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                      Uploading...
+                    </span>
+                  )}
+                  {!uploadStatus.uploading && uploadStatus.fileId && (
+                    <span className="text-sm font-bold text-green-600 flex items-center gap-1">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"></path></svg>
+                      Ready
+                    </span>
+                  )}
+                  {!uploadStatus.uploading && uploadStatus.error && (
+                    <span className="text-sm font-bold text-red-600">Failed: {uploadStatus.error}</span>
+                  )}
+                </div>
               </div>
               <button 
                 type="submit" 
-                disabled={isSubmitting}
-                className={`px-10 py-4 rounded-lg font-bold text-lg text-white shadow-lg transition-all ${isSubmitting ? 'bg-slate-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 active:scale-95'}`}
+                disabled={isSubmitting || uploadStatus.uploading}
+                className={`px-10 py-4 rounded-lg font-bold text-lg text-white shadow-lg transition-all ${(isSubmitting || uploadStatus.uploading) ? 'bg-slate-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 active:scale-95'}`}
               >
-                {isSubmitting ? "Processing..." : "Submit Bid"}
+                {isSubmitting ? "Processing..." : (uploadStatus.uploading ? "Uploading File..." : "Submit Bid")}
               </button>
             </div>
           </form>
