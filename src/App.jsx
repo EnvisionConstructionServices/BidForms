@@ -405,12 +405,34 @@ const App = () => {
                                if (arrayIndex === 0) draftValue = savedDraft[inputName];
                            }
                         }
+
+                        // Tracker logic for inline inputs (Trade Partner to Fill In)
+                        const inlineInputName = `${item.number ? String(item.number).replace(/[^a-zA-Z0-9]/g, '_') : 'field'}_inline`;
+                        nameTracker[inlineInputName] = (nameTracker[inlineInputName] || 0) + 1;
+                        const inlineArrayIndex = nameTracker[inlineInputName] - 1;
+                        let inlineDraftValue = '';
+                        if (savedDraft?.[inlineInputName]) {
+                           if (Array.isArray(savedDraft[inlineInputName])) {
+                               inlineDraftValue = savedDraft[inlineInputName][inlineArrayIndex] || '';
+                           } else {
+                               if (inlineArrayIndex === 0) inlineDraftValue = savedDraft[inlineInputName];
+                           }
+                        }
+
+                        // Generate the HTML for the description, injecting an input if the placeholder is found
+                        let descriptionHtml = item.description || '';
+                        const fillInRegex = /\[TRADE PARTNER TO FILL IN\]/gi;
+                        if (fillInRegex.test(descriptionHtml)) {
+                            const escapedValue = (inlineDraftValue || '').replace(/"/g, '&quot;');
+                            const inputHtml = `<input type="text" name="${inlineInputName}" value="${escapedValue}" placeholder="Enter item description..." class="mx-1 px-2 py-0.5 border-b-2 border-sky-400 focus:border-sky-600 outline-none bg-sky-50 focus:bg-sky-100 rounded-t min-w-[220px] text-sm font-bold text-sky-900 placeholder-sky-400 transition-colors inline-block shadow-sm" required />`;
+                            descriptionHtml = descriptionHtml.replace(fillInRegex, inputHtml);
+                        }
                         
                         return (
                           <div key={idx} className={`flex flex-col md:flex-row gap-4 py-3 border-b border-slate-50 last:border-0 items-start md:items-center ${item.type === 'SUBHEADER' ? 'bg-slate-50 -mx-4 px-4 py-3 font-bold italic text-slate-400' : ''}`}>
                             <div className="flex-1 flex items-start">
                               <span className="text-slate-400 text-xs mr-3 font-mono mt-[2px]">{item.number}</span>
-                              <span dangerouslySetInnerHTML={{ __html: item.description }} />
+                              <span dangerouslySetInnerHTML={{ __html: descriptionHtml }} className="leading-relaxed" />
                             </div>
                             
                             {item.type !== 'SUBHEADER' && !item.isBold && (
