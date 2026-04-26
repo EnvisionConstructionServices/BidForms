@@ -450,8 +450,8 @@ const App = () => {
                         const fillInRegex = /\[TRADE PARTNER TO FILL IN\]/gi;
                         if (fillInRegex.test(descriptionHtml)) {
                             const escapedValue = (inlineDraftValue || '').replace(/"/g, '&quot;');
-                            // Removed "required", changed colors to slate/grey, increased width drastically, and removed placeholder
-                            const inputHtml = `<input type="text" name="${inlineInputName}" value="${escapedValue}" class="mx-1 px-2 py-0.5 border-b-2 border-slate-300 focus:border-slate-500 outline-none bg-slate-100 focus:bg-slate-200 rounded-t w-[250px] md:w-[450px] max-w-full text-sm font-bold text-slate-700 transition-colors inline-block shadow-sm" />`;
+                            // Added placeholder="Fill in..." back into the input tag
+                            const inputHtml = `<input type="text" name="${inlineInputName}" value="${escapedValue}" placeholder="Fill in..." class="mx-1 px-2 py-0.5 border-b-2 border-slate-300 focus:border-slate-500 outline-none bg-slate-100 focus:bg-slate-200 rounded-t w-[250px] md:w-[450px] max-w-full text-sm font-bold text-slate-700 placeholder-slate-400 transition-colors inline-block shadow-sm" />`;
                             descriptionHtml = descriptionHtml.replace(fillInRegex, inputHtml);
                         }
                         
