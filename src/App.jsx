@@ -424,7 +424,8 @@ const App = () => {
                         const fillInRegex = /\[TRADE PARTNER TO FILL IN\]/gi;
                         if (fillInRegex.test(descriptionHtml)) {
                             const escapedValue = (inlineDraftValue || '').replace(/"/g, '&quot;');
-                            const inputHtml = `<input type="text" name="${inlineInputName}" value="${escapedValue}" placeholder="Enter item description..." class="mx-1 px-2 py-0.5 border-b-2 border-sky-400 focus:border-sky-600 outline-none bg-sky-50 focus:bg-sky-100 rounded-t min-w-[220px] text-sm font-bold text-sky-900 placeholder-sky-400 transition-colors inline-block shadow-sm" required />`;
+                            // Removed "required", changed colors to slate/grey, and increased width drastically
+                            const inputHtml = `<input type="text" name="${inlineInputName}" value="${escapedValue}" placeholder="Enter item description..." class="mx-1 px-2 py-0.5 border-b-2 border-slate-300 focus:border-slate-500 outline-none bg-slate-100 focus:bg-slate-200 rounded-t w-[250px] md:w-[450px] max-w-full text-sm font-bold text-slate-700 placeholder-slate-400 transition-colors inline-block shadow-sm" />`;
                             descriptionHtml = descriptionHtml.replace(fillInRegex, inputHtml);
                         }
                         
