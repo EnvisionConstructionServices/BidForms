@@ -203,10 +203,10 @@ const App = () => {
           <form onSubmit={handleFormSubmit} className="space-y-8">
             {formData.orderedHeaders.map((header, index) => (
               <div key={header} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <h2 
-                  className="bg-slate-800 text-white p-3 font-bold"
-                  style={{ borderTop: `4px solid ${index % 2 === 0 ? '#59BA48' : '#1B95D2'}` }}
-                >
+                {/* Dedicated Accent Bar */}
+                <div style={{ height: '6px', backgroundColor: index % 2 === 0 ? '#59BA48' : '#1B95D2' }} />
+                
+                <h2 className="bg-slate-800 text-white p-3 font-bold">
                   {header}
                 </h2>
                 <div className="p-4 space-y-4">
